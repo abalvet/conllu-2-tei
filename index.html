@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Pour pointer vers un serveur d'analyse distinct (ex. Huma-Num) depuis une page hébergée
+     ailleurs (GitHub Pages, site Corli), renseigner l'URL de base ci-dessous, ou passer ?api=URL.
+     Laisser vide : détection automatique sur la même origine, sinon mode autonome. -->
+<meta name="conllu2tei-api" content="">
+<title>Convertisseur CoNLL-U vers XML TEI</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  max-width: 1200px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #333; background: #f5f5f5; }
+.container { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+h1 { color: #2c3e50; margin-bottom: 6px; font-size: 28px; }
+.subtitle { color: #7f8c8d; margin-bottom: 10px; font-size: 14px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; margin-bottom: 24px; }
+.badge.standalone { background: #fdf2e0; color: #8a5a00; }
+.badge.server { background: #d4edda; color: #155724; }
+.badge.pending { background: #eee; color: #666; }
+.section { margin-bottom: 30px; }
+.section-title { font-size: 18px; font-weight: 600; color: #2c3e50; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #3498db; }
+.tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+.tab { padding: 10px 20px; background: none; border: none; cursor: pointer; font-size: 14px; color: #7f8c8d;
+  border-bottom: 2px solid transparent; border-radius: 0; }
+.tab:hover { color: #2c3e50; }
+.tab.active { color: #3498db; border-bottom-color: #3498db; font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.input-group { margin-bottom: 15px; }
+label { display: block; margin-bottom: 5px; font-weight: 500; color: #555; font-size: 14px; }
+label.inline { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-bottom: 6px; }
+input[type="file"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
+input[type="checkbox"], input[type="radio"] { width: auto; }
+textarea { width: 100%; min-height: 200px; padding: 12px; border: 1px solid #ddd; border-radius: 4px;
+  font-family: 'Courier New', monospace; font-size: 13px; resize: vertical; }
+.button-group { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+button { padding: 12px 24px; font-size: 14px; font-weight: 500; border: none; border-radius: 4px; cursor: pointer; transition: all .2s; }
+.btn-primary { background: #3498db; color: #fff; } .btn-primary:hover { background: #2980b9; }
+.btn-secondary { background: #95a5a6; color: #fff; } .btn-secondary:hover { background: #7f8c8d; }
+.btn-success { background: #27ae60; color: #fff; } .btn-success:hover { background: #229954; }
+button:disabled { background: #bdc3c7; cursor: not-allowed; }
+.output-area { background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin-top: 20px; display: none; }
+.output-area.visible { display: block; }
+.output-text { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 4px; max-height: 480px; overflow: auto;
+  font-family: 'Courier New', monospace; font-size: 12px; white-space: pre; tab-size: 2; }
+.stats { font-size: 13px; color: #555; margin-bottom: 10px; }
+.stats .ok { color: #155724; font-weight: 600; } .stats .ko { color: #721c24; font-weight: 600; }
+.message { padding: 12px; border-radius: 4px; margin-bottom: 15px; display: none; }
+.message.visible { display: block; }
+.message.success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+.message.error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+.message.info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+.help-text { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+.inline-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+.inline-group.two { grid-template-columns: 1fr 1fr; }
+.options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 30px; }
+fieldset { border: 1px solid #ddd; border-radius: 4px; padding: 12px 14px; }
+legend { font-size: 13px; font-weight: 600; color: #555; padding: 0 6px; }
+details { margin-top: 12px; } summary { cursor: pointer; font-size: 14px; color: #2c3e50; font-weight: 500; margin-bottom: 10px; }
+.warnings { background: #fff8e1; border: 1px solid #ffe082; color: #6d4c00; padding: 10px 14px; border-radius: 4px; font-size: 12px; margin-bottom: 12px; max-height: 160px; overflow: auto; display: none; }
+.warnings.visible { display: block; }
+.notice { background: #f1f5f9; border-left: 3px solid #3498db; padding: 10px 14px; font-size: 13px; color: #445; margin-bottom: 15px; }
+.loading { display: none; margin-top: 10px; } .loading.visible { display: flex; align-items: center; gap: 10px; color: #7f8c8d; }
+.spinner { border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hidden { display: none !important; }
+@media (max-width: 768px) {
+  body { padding: 10px; } .container { padding: 20px; }
+  .inline-group, .inline-group.two, .options-grid { grid-template-columns: 1fr; }
+  .button-group { flex-direction: column; } button { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔄 Convertisseur CoNLL-U vers XML TEI</h1>
+  <p class="subtitle">Annotations en dépendances (Universal Dependencies, CoNLL-U) vers XML TEI — GT XMLisation, consortium Corli</p>
+  <span id="modeBadge" class="badge pending">Détection du mode…</span>
+
+  <div id="message" class="message"></div>
+
+  <div class="section">
+    <div class="section-title">Source des données</div>
+    <div class="tabs">
+      <button class="tab active" data-tab="conllu" onclick="switchTab('conllu')">📄 CoNLL-U existant</button>
+      <button class="tab" data-tab="analyse" onclick="switchTab('analyse')">🔍 Analyser un texte ou un XML</button>
+    </div>
+
+    <div id="tab-conllu" class="tab-content active">
+      <div class="input-group">
+        <label for="fileInput">Charger un fichier CoNLL-U</label>
+        <input type="file" id="fileInput" accept=".conllu,.txt" onchange="handleConlluFile(event)">
+        <p class="help-text">Formats acceptés : .conllu, .txt. Le traitement reste entièrement dans votre navigateur.</p>
+      </div>
+      <div class="input-group">
+        <label for="conlluInput">Ou coller le contenu CoNLL-U</label>
+        <textarea id="conlluInput" spellcheck="false" placeholder="# sent_id = 1&#10;# text = Les chats dorment.&#10;1&#9;Les&#9;le&#9;DET&#9;_&#9;Definite=Def|Number=Plur|PronType=Art&#9;2&#9;det&#9;_&#9;_&#10;2&#9;chats&#9;chat&#9;NOUN&#9;_&#9;Gender=Masc|Number=Plur&#9;3&#9;nsubj&#9;_&#9;_&#10;3&#9;dorment&#9;dormir&#9;VERB&#9;_&#9;Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin&#9;0&#9;root&#9;_&#9;SpaceAfter=No&#10;4&#9;.&#9;.&#9;PUNCT&#9;_&#9;_&#9;3&#9;punct&#9;_&#9;_"></textarea>
+        <div class="button-group"><button class="btn-secondary" onclick="loadExample()">📎 Insérer un exemple</button></div>
+      </div>
+    </div>
+
+    <div id="tab-analyse" class="tab-content">
+      <div id="noEngine" class="notice hidden">
+        Aucun moteur d'analyse n'est joignable depuis cette page (mode autonome : l'API publique UDPipe de LINDAT
+        est inaccessible ou refuse les requêtes depuis ce site). Vous pouvez analyser vos textes ailleurs
+        (UDPipe en ligne, Stanza, Corli), puis coller ou charger le CoNLL-U dans l'onglet précédent.
+      </div>
+      <div id="analyseForm">
+        <div class="input-group">
+          <label for="analyseFile">Charger un fichier à analyser (optionnel)</label>
+          <input type="file" id="analyseFile" accept=".txt,.text,.xml,.tei,.cha,.trs,.eaf,.textgrid">
+          <p class="help-text">TXT et XML/TEI : analyse dans cette page. CHA, TRS, EAF, TextGrid : moteur « Corli » (mode serveur) uniquement.</p>
+        </div>
+        <div class="input-group">
+          <label for="textInput">Ou coller le texte à analyser</label>
+          <textarea id="textInput" placeholder="Collez ici le texte à analyser. Les paragraphes sont séparés par une ligne vide."></textarea>
+        </div>
+        <div class="inline-group">
+          <div class="input-group"><label for="engineSelect">Moteur</label><select id="engineSelect"></select></div>
+          <div class="input-group"><label for="languageSelect">Langue</label><select id="languageSelect"></select></div>
+          <div class="input-group"><label for="modelSelect">Modèle</label><select id="modelSelect"><option value="">Modèle par défaut</option></select></div>
+        </div>
+        <div class="inline-group two">
+          <div class="input-group">
+            <label for="inputKind">Nature de l'entrée</label>
+            <select id="inputKind">
+              <option value="auto">Détection automatique</option>
+              <option value="text">Texte brut → CoNLL-U</option>
+              <option value="xml">XML existant → XML enrichi (balises &lt;s&gt;/&lt;w&gt;)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="blockNames">XML : éléments à annoter</label>
+            <input type="text" id="blockNames" value="p,u,ab">
+            <p class="help-text">Noms locaux, séparés par des virgules. Le contenu de ces éléments est remplacé par des phrases annotées ; la structure extérieure et l'en-tête sont conservés.</p>
+          </div>
+        </div>
+        <div class="button-group"><button class="btn-primary" id="analyseBtn" onclick="runAnalysis()">🚀 Analyser</button></div>
+        <div id="loading" class="loading"><div class="spinner"></div><span id="loadingText">Analyse en cours…</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Options de sortie</div>
+    <div class="options-grid">
+      <fieldset>
+        <legend>Profil TEI</legend>
+        <label class="inline"><input type="radio" name="profile" value="tei" checked> TEI P5 : &lt;w&gt;/&lt;pc&gt; et &lt;linkGrp&gt; de dépendances (conventions ParlaMint)</label>
+        <label class="inline"><input type="radio" name="profile" value="txm"> TXM / XML-w : attributs à plat sur &lt;w&gt;</label>
+        <p class="help-text">Le profil « TXM » est pensé pour l'import en tant que propriétés de mots ; le profil « TEI P5 » vise la validité TEI et l'interopérabilité.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Mise en forme</legend>
+        <div class="inline-group two" style="gap:10px">
+          <div class="input-group"><label for="optIndent">Indentation</label>
+            <select id="optIndent"><option value="2">2 espaces</option><option value="4">4 espaces</option><option value="tab">Tabulation</option></select></div>
+          <div class="input-group"><label for="optLayout">Mots</label>
+            <select id="optLayout"><option value="lines">Un mot par ligne</option><option value="inline">Une phrase par ligne</option></select></div>
+        </div>
+        <div class="input-group"><label for="optSchema">Déclaration de schéma</label>
+          <select id="optSchema"><option value="none">Aucune</option><option value="tei_all">TEI All (RelaxNG, pour oXygen / validation)</option></select></div>
+      </fieldset>
+      <fieldset>
+        <legend>Contenu</legend>
+        <label class="inline"><input type="checkbox" id="optKeepMeta" checked> Conserver les métadonnées de phrase (hors sent_id et text)</label>
+        <label class="inline"><input type="checkbox" id="optKeepText"> Conserver « # text » de chaque phrase</label>
+        <label class="inline"><input type="checkbox" id="optEnhanced"> Dépendances enrichies (colonne DEPS) — profil TEI P5</label>
+        <label class="inline"><input type="checkbox" id="optSplitMisc" checked> Séparer MISC en attributs distincts — profil TXM</label>
+        <label class="inline"><input type="checkbox" id="optSplitFeats"> Séparer FEATS en attributs distincts (feat_*) — profil TXM</label>
+      </fieldset>
+      <fieldset>
+        <legend>Langue du document</legend>
+        <div class="input-group"><label for="mLang">Code xml:lang (ex. fr)</label><input type="text" id="mLang" placeholder="fr"></div>
+      </fieldset>
+    </div>
+    <details>
+      <summary>Métadonnées de l'en-tête TEI (facultatif)</summary>
+      <div class="options-grid">
+        <div class="input-group"><label for="mTitle">Titre</label><input type="text" id="mTitle"></div>
+        <div class="input-group"><label for="mAuthor">Auteur ou responsable</label><input type="text" id="mAuthor"></div>
+        <div class="input-group"><label for="mPublisher">Éditeur / diffuseur</label><input type="text" id="mPublisher"></div>
+        <div class="input-group"><label for="mLicence">Licence (texte)</label><input type="text" id="mLicence" placeholder="CC BY 4.0"></div>
+        <div class="input-group"><label for="mLicenceUrl">Licence (URL)</label><input type="text" id="mLicenceUrl" placeholder="https://creativecommons.org/licenses/by/4.0/"></div>
+        <div class="input-group"><label for="mSource">Description de la source</label><input type="text" id="mSource"></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="button-group">
+    <button class="btn-success" onclick="convertToTEI()">✨ Convertir en TEI</button>
+    <button class="btn-secondary" onclick="clearAll()">🗑️ Effacer tout</button>
+  </div>
+
+  <div id="outputArea" class="output-area">
+    <div class="section-title">Résultat XML TEI</div>
+    <div id="stats" class="stats"></div>
+    <div id="warnings" class="warnings"></div>
+    <div class="output-text" id="outputText"></div>
+    <div class="button-group">
+      <button class="btn-primary" onclick="downloadTEI()">💾 Télécharger le fichier TEI</button>
+      <button class="btn-secondary" onclick="copyToClipboard()">📋 Copier dans le presse-papier</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     NOYAU : conversion CoNLL-U → arbre → XML. Aucune dépendance (ni DOM, ni bibliothèque),
+     sauf xmlToTree() qui utilise DOMParser pour lire un XML existant.
+     ====================================================================== -->
+<script id="c2t-core">
+(function (root) {
+'use strict';
+
+const TEI_NS = 'http://www.tei-c.org/ns/1.0';
+const APP = { ident: 'conllu2tei', version: '3.0' };
+const SCHEMAS = {
+  tei_all: { href: 'https://tei-c.org/release/xml/tei/custom/schema/relaxng/tei_all.rng', type: 'http://relaxng.org/ns/structure/1.0' }
+};
+const DEFAULTS = {
+  profile: 'tei',            // 'tei' | 'txm'
+  indent: '  ',
+  tokenLayout: 'lines',      // 'lines' | 'inline'
+  keepMeta: true, keepText: false, enhanced: false,
+  splitMisc: true, splitFeats: false,
+  schema: 'none',
+  ignoreMeta: ['generator', 'udpipe_model', 'udpipe_model_licence'],
+  lang: '', title: '', author: '', publisher: '', licence: '', licenceUrl: '', source: '',
+  blockNames: ['p', 'u', 'ab']
+};
+
+/* ---------- arbre XML minimal ---------- */
+function el(name, attrs, children) {
+  const a = Array.isArray(attrs) ? attrs
+    : Object.entries(attrs || {}).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]);
+  return { t: 'el', name, attrs: a, children: children || [] };
+}
+const tx = v => ({ t: 'text', value: String(v) });
+const localName = n => { const i = n.indexOf(':'); return i < 0 ? n : n.slice(i + 1); };
+
+/* ---------- sérialisation avec indentation ---------- */
+const BAD_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+const escText = s => s.replace(BAD_XML, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escAttr = s => s.replace(BAD_XML, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/\t/g, '&#9;').replace(/\n/g, '&#10;').replace(/\r/g, '&#13;');
+
+function openTag(n, selfClose) {
+  let s = '<' + n.name;
+  for (const [k, v] of n.attrs) s += ` ${k}="${escAttr(v)}"`;
+  return s + (selfClose ? '/>' : '>');
+}
+function inlineStr(n) {
+  if (n.t === 'text') return escText(n.value);
+  if (n.t === 'comment') return '<!--' + n.value + '-->';
+  if (n.t === 'raw') return n.value;
+  if (!n.children.length) return openTag(n, true);
+  return openTag(n) + n.children.map(inlineStr).join('') + '</' + n.name + '>';
+}
+const hasText = n => n.children.some(c => c.t === 'text' && c.value.trim() !== '');
+
+function ser(n, depth, o, out) {
+  const pad = o.indent.repeat(depth);
+  if (n.t === 'text') { if (n.value.trim()) out.push(pad + escText(n.value.trim())); return; }
+  if (n.t === 'comment') { out.push(pad + '<!--' + n.value + '-->'); return; }
+  if (n.t === 'raw') { out.push(pad + n.value); return; }
+  if (!n.children.length) { out.push(pad + openTag(n, true)); return; }
+  const ln = localName(n.name);
+  if (ln === 'w' || ln === 'pc' || hasText(n)) { out.push(pad + inlineStr(n)); return; }   // contenu mixte : on n'y touche pas
+  out.push(pad + openTag(n));
+  const inl = c => o.tokenLayout === 'inline' && ln === 's' && c.t === 'el' && ['w', 'pc', 'seg'].includes(localName(c.name));
+  let run = [];
+  const flush = () => { if (run.length) { out.push(o.indent.repeat(depth + 1) + run.map(inlineStr).join(' ')); run = []; } };
+  for (const c of n.children) { if (inl(c)) run.push(c); else { flush(); ser(c, depth + 1, o, out); } }
+  flush();
+  out.push(pad + '</' + n.name + '>');
+}
+function serializeTree(rootNode, o) { const out = []; ser(rootNode, 0, o, out); return out.join('\n'); }
+
+/* ---------- lecture CoNLL-U ---------- */
+function parseConllu(input) {
+  const lines = String(input).replace(/^\uFEFF/, '').split(/\r?\n/);
+  const sentences = [], warnings = [];
+  const warn = m => { if (warnings.length < 200) warnings.push(m); };
+  let cur = null, pend = { newdoc: null, newpar: null };
+  const ensure = ln => {
+    if (!cur) { cur = { meta: {}, comments: [], tokens: [], mwts: [], nEmpty: 0, line: ln, newdoc: pend.newdoc, newpar: pend.newpar }; pend = { newdoc: null, newpar: null }; }
+    return cur;
+  };
+  const flush = () => {
+    if (!cur) return;
+    if (cur.tokens.length) { validateSentence(cur, warn); sentences.push(cur); }
+    else { pend = { newdoc: cur.newdoc || pend.newdoc, newpar: cur.newpar || pend.newpar }; }
+    cur = null;
+  };
+  lines.forEach((raw, i) => {
+    const ln = i + 1, line = raw.replace(/\s+$/, '');
+    if (line === '') { flush(); return; }
+    if (line[0] === '#') {
+      const s = ensure(ln); let m;
+      if ((m = line.match(/^#\s*newdoc(?:\s+id\s*=\s*(.*))?$/))) s.newdoc = { id: (m[1] || '').trim() };
+      else if ((m = line.match(/^#\s*newpar(?:\s+id\s*=\s*(.*))?$/))) s.newpar = { id: (m[1] || '').trim() };
+      else if ((m = line.match(/^#\s*([^\s=]+)\s*=\s*(.*)$/))) s.meta[m[1]] = m[2];
+      else s.comments.push(line.replace(/^#\s?/, ''));
+      return;
+    }
+    let cols = line.split('\t');
+    if (cols.length !== 10) {
+      const alt = line.split(/\s+/);
+      if (cols.length < 10 && alt.length === 10) { cols = alt; warn(`Ligne ${ln} : colonnes séparées par des espaces (tabulations attendues).`); }
+      else { warn(`Ligne ${ln} : ${cols.length} colonnes au lieu de 10, ligne ignorée.`); return; }
+    }
+    const s = ensure(ln), id = cols[0];
+    if (/^\d+$/.test(id)) s.tokens.push({ id: +id, form: cols[1], lemma: cols[2], upos: cols[3], xpos: cols[4], feats: cols[5], head: cols[6], deprel: cols[7], deps: cols[8], misc: cols[9] });
+    else if (/^\d+-\d+$/.test(id)) { const [a, b] = id.split('-').map(Number); s.mwts.push({ start: a, end: b, form: cols[1], misc: cols[9] }); }
+    else if (/^\d+\.\d+$/.test(id)) s.nEmpty++;
+    else warn(`Ligne ${ln} : identifiant de token invalide « ${id} », ligne ignorée.`);
+  });
+  flush();
+  return { sentences, warnings };
+}
+
+function validateSentence(s, warn) {
+  const label = s.meta.sent_id ? `phrase ${s.meta.sent_id}` : `phrase ligne ${s.line}`;
+  const ids = new Set(s.tokens.map(t => t.id));
+  s.tokens.forEach((t, i) => { if (t.id !== i + 1) { warn(`${label} : numérotation non continue (attendu ${i + 1}, trouvé ${t.id}).`); } });
+  let roots = 0;
+  for (const t of s.tokens) {
+    if (t.head === '0') roots++;
+    else if (!/^\d+$/.test(t.head) || !ids.has(+t.head)) warn(`${label} : token ${t.id} (${t.form}) a une tête invalide « ${t.head} ».`);
+  }
+  if (roots !== 1) warn(`${label} : ${roots} racine(s) (une seule attendue).`);
+  if (s.nEmpty) warn(`${label} : ${s.nEmpty} nœud(s) vide(s) (x.y) ignoré(s).`);
+}
+
+/* ---------- construction TEI ---------- */
+function makeCtx(used) {
+  const u = used || new Set();
+  return { used: u, sentCounter: 0, parCounter: 0, docCounter: 0, tokens: 0, sentences: 0, docs: 0, usedMisc: false,
+    uniqueId(base) { let id = base, k = 1; while (u.has(id)) id = base + '-' + (++k); u.add(id); return id; } };
+}
+function sanitizeId(raw, prefix) {
+  let s = String(raw).trim().replace(/[^\p{L}\p{N}_.\-]/gu, '_');
+  if (!s) s = prefix || '_';
+  if (!/^[\p{L}_]/u.test(s)) s = (prefix || '_') + s;
+  return s;
+}
+function parseMisc(misc) {
+  if (!misc || misc === '_') return [];
+  return misc.split('|').filter(Boolean).map(p => { const i = p.indexOf('='); return i < 0 ? [p, ''] : [p.slice(0, i), p.slice(i + 1)]; });
+}
+function parseFeats(f) { return parseMisc(f); }
+function attrName(key, taken, prefix) {
+  let a = key.replace(/[^A-Za-z0-9_.\-]/g, '_').toLowerCase();
+  if (!/^[a-z_]/.test(a)) a = 'm_' + a;
+  if (prefix) a = prefix + a;
+  while (taken.has(a)) a = 'x_' + a;
+  taken.add(a);
+  return a;
+}
+
+function buildSentence(s, ctx, o) {
+  const num = ++ctx.sentCounter;
+  const raw = s.meta.sent_id;
+  const sid = ctx.uniqueId(raw ? sanitizeId(raw, 's') : 's' + num);
+  const tid = n => `${sid}.t${n}`;
+  const isTei = o.profile !== 'txm';
+  const ignored = new Set(['sent_id', ...(o.keepText ? [] : ['text']), ...(o.ignoreMeta || [])]);
+  const extras = Object.entries(s.meta).filter(([k]) => !ignored.has(k));
+
+  const sAttrs = [['xml:id', sid]];
+  if (raw && raw !== sid) sAttrs.push(['n', raw]);
+  const children = [];
+  if (o.keepMeta || (o.keepText && s.meta.text !== undefined)) {
+    if (isTei) {
+      for (const [k, v] of extras) if (o.keepMeta || k === 'text') children.push(el('note', { type: 'conllu', n: k }, [tx(v)]));
+      if (o.keepMeta) for (const c of s.comments) children.push(el('note', { type: 'conllu' }, [tx(c)]));
+    } else {
+      const taken = new Set(['xml:id', 'n']);
+      for (const [k, v] of extras) if (o.keepMeta || k === 'text') sAttrs.push([attrName(k, taken), v]);
+    }
+  }
+
+  const mwtStart = new Map(s.mwts.map(m => [m.start, m]));
+  const ids = new Set(s.tokens.map(t => t.id));
+  const words = [];
+  let group = null;
+  const links = [], enhLinks = [];
+
+  for (const t of s.tokens) {
+    const misc = parseMisc(t.misc);
+    const noSpace = misc.some(([k, v]) => k === 'SpaceAfter' && v === 'No');
+    const rest = misc.filter(([k]) => k !== 'SpaceAfter');
+    const a = [['xml:id', tid(t.id)]];
+    let name = 'w';
+
+    if (isTei) {
+      if (t.upos === 'PUNCT') name = 'pc';
+      if (t.lemma !== '_') a.push(['lemma', t.lemma]);
+      if (t.upos !== '_') a.push(['pos', t.upos]);
+      const msd = [];
+      if (t.upos !== '_') msd.push('UPosTag=' + t.upos);
+      if (t.xpos !== '_') msd.push('XPosTag=' + t.xpos);
+      if (t.feats !== '_') msd.push(t.feats);
+      if (msd.length) a.push(['msd', msd.join('|')]);
+      if (noSpace) a.push(['join', 'right']);
+      if (rest.length) { ctx.usedMisc = true; a.push(['ana', rest.map(([k, v]) => 'misc:' + k + (v ? '=' + v : '')).map(x => x.replace(/\s/g, '%20')).join(' ')]); }
+      // dépendances
+      if (t.head === '0') links.push(el('link', { ana: 'ud-syn:' + t.deprel, target: `#${sid} #${tid(t.id)}` }));
+      else if (/^\d+$/.test(t.head) && ids.has(+t.head)) links.push(el('link', { ana: 'ud-syn:' + t.deprel, target: `#${tid(+t.head)} #${tid(t.id)}` }));
+      if (o.enhanced && t.deps !== '_') {
+        for (const d of t.deps.split('|')) {
+          const i = d.indexOf(':'); if (i < 0) continue;
+          const h = d.slice(0, i), rel = d.slice(i + 1);
+          if (h === '0') enhLinks.push(el('link', { ana: 'ud-syn:' + rel, target: `#${sid} #${tid(t.id)}` }));
+          else if (/^\d+$/.test(h) && ids.has(+h)) enhLinks.push(el('link', { ana: 'ud-syn:' + rel, target: `#${tid(+h)} #${tid(t.id)}` }));
+        }
+      }
+    } else {
+      const taken = new Set(['xml:id']);
+      const put = (k, v) => { taken.add(k); a.push([k, v]); };
+      a.push(['n', String(t.id)]); taken.add('n');
+      if (t.lemma !== '_') put('lemma', t.lemma);
+      if (t.upos !== '_') put('upos', t.upos);
+      if (t.xpos !== '_') put('xpos', t.xpos);
+      if (t.feats !== '_') {
+        if (o.splitFeats) for (const [k, v] of parseFeats(t.feats)) a.push([attrName(k, taken, 'feat_'), v]);
+        else put('feats', t.feats);
+      }
+      if (t.deprel !== '_') put('deprel', t.deprel);
+      if (t.head !== '_' && t.head !== '0' && /^\d+$/.test(t.head) && ids.has(+t.head)) put('head', tid(+t.head));
+      if (t.deps !== '_') put('deps', t.deps);
+      if (noSpace) put('join', 'right');
+      if (rest.length) {
+        if (o.splitMisc) for (const [k, v] of rest) a.push([attrName(k, taken), v]);
+        else put('misc', rest.map(([k, v]) => k + (v ? '=' + v : '')).join('|'));
+      }
+      const m = mwtStart.get(t.id);
+      if (m) put('mwt', m.form);
+    }
+    ctx.tokens++;
+    const node = el(name, a, [tx(t.form)]);
+
+    const m = mwtStart.get(t.id);
+    if (isTei && m) { group = el('seg', { 'xml:id': ctx.uniqueId(`${sid}.m${m.start}-${m.end}`), type: 'mwt', n: m.form }, []); group._end = m.end; words.push(group); }
+    (group ? group.children : words).push(node);
+    if (group && t.id >= group._end) group = null;
+  }
+  children.push(...words);
+  if (isTei && links.length) children.push(el('linkGrp', { type: 'UD-SYN', targFunc: 'head argument' }, links));
+  if (isTei && enhLinks.length) children.push(el('linkGrp', { type: 'UD-ENHANCED', targFunc: 'head argument' }, enhLinks));
+  ctx.sentences++;
+  return el('s', sAttrs, children);
+}
+
+function buildBody(sentences, ctx, o) {
+  const body = el('body'); let div = null, par = null;
+  const anyDoc = sentences.some(s => s.newdoc);
+  for (const s of sentences) {
+    if (s.newdoc || (anyDoc && !div)) {
+      const base = s.newdoc && s.newdoc.id ? sanitizeId(s.newdoc.id, 'd') : 'd' + (++ctx.docCounter);
+      div = el('div', { 'xml:id': ctx.uniqueId(base) }); body.children.push(div); par = null; ctx.docs++;
+    }
+    if (s.newpar || !par) {
+      const base = s.newpar && s.newpar.id ? sanitizeId(s.newpar.id, 'p') : 'p' + (++ctx.parCounter);
+      par = el('p', { 'xml:id': ctx.uniqueId(base) });
+      (div || body).children.push(par);
+    }
+    par.children.push(buildSentence(s, ctx, o));
+  }
+  return body;
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+function prefixDefs(ctx) {
+  const defs = [el('prefixDef', { ident: 'ud-syn', matchPattern: '([^:]+)(:.+)?', replacementPattern: 'https://universaldependencies.org/u/dep/$1.html' },
+    [el('p', {}, [tx('Relations de dépendance Universal Dependencies (liste des relations UD).')])])];
+  if (ctx.usedMisc) defs.push(el('prefixDef', { ident: 'misc', matchPattern: '(.+)', replacementPattern: 'https://universaldependencies.org/format.html#miscellaneous-annotations' },
+    [el('p', {}, [tx('Valeurs de la colonne MISC du CoNLL-U, conservées sous la forme Clé=Valeur.')])]));
+  return el('listPrefixDef', {}, defs);
+}
+function appInfo() {
+  return el('appInfo', {}, [el('application', { ident: APP.ident, version: APP.version }, [el('label', {}, [tx('Convertisseur CoNLL-U vers TEI (GT XMLisation, Corli)')])])]);
+}
+function changeNode() { return el('change', { when: today() }, [tx(`Annotation UD intégrée par ${APP.ident} ${APP.version}`)]); }
+
+function buildHeader(o, ctx) {
+  const titleStmt = el('titleStmt', {}, [el('title', {}, [tx(o.title || 'Document converti depuis CoNLL-U')])]);
+  if (o.author) titleStmt.children.push(el('author', {}, [tx(o.author)]));
+  const pubStmt = el('publicationStmt');
+  if (o.publisher || o.licence || o.licenceUrl) {
+    pubStmt.children.push(el('publisher', {}, [tx(o.publisher || 'Non renseigné')]));
+    if (o.licence || o.licenceUrl) pubStmt.children.push(el('availability', {}, [el('licence', { target: o.licenceUrl }, [tx(o.licence || o.licenceUrl)])]));
+  } else pubStmt.children.push(el('p', {}, [tx('Généré automatiquement.')]));
+  const fileDesc = el('fileDesc', {}, [titleStmt, pubStmt,
+    el('sourceDesc', {}, [el('p', {}, [tx(o.source || 'Converti depuis le format CoNLL-U (Universal Dependencies).')])])]);
+  const enc = el('encodingDesc', {}, [appInfo()]);
+  if (o.profile !== 'txm') enc.children.push(prefixDefs(ctx));
+  const parts = [fileDesc, enc];
+  if (o.lang) parts.push(el('profileDesc', {}, [el('langUsage', {}, [el('language', { ident: o.lang }, [tx(o.lang)])])]));
+  parts.push(el('revisionDesc', {}, [changeNode()]));
+  return el('teiHeader', {}, parts);
+}
+
+function prolog(o, extra) {
+  let s = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  const sc = SCHEMAS[o.schema];
+  if (sc) s += `<?xml-model href="${sc.href}" type="application/xml" schematypens="${sc.type}"?>\n`;
+  return s + (extra || '');
+}
+
+function normalizeOptions(opts) {
+  const o = Object.assign({}, DEFAULTS, opts || {});
+  if (o.indent === 'tab') o.indent = '\t'; else if (/^\d+$/.test(String(o.indent))) o.indent = ' '.repeat(+o.indent);
+  return o;
+}
+
+/* ---------- API : CoNLL-U → TEI ---------- */
+function convert(conlluText, opts) {
+  const o = normalizeOptions(opts);
+  const { sentences, warnings } = parseConllu(conlluText);
+  if (!sentences.length) throw new Error('Aucune phrase CoNLL-U détectée dans le texte fourni.');
+  const ctx = makeCtx();
+  const body = buildBody(sentences, ctx, o);
+  const tei = el('TEI', [['xmlns', TEI_NS], ...(o.lang ? [['xml:lang', o.lang]] : [])],
+    [buildHeader(o, ctx), el('text', {}, [body])]);
+  const xml = prolog(o) + serializeTree(tei, o) + '\n';
+  return { xml, warnings, stats: { sentences: ctx.sentences, tokens: ctx.tokens, docs: ctx.docs } };
+}
+
+/* ---------- XML existant → XML enrichi ---------- */
+function nodeToTree(n) {
+  if (n.nodeType === 1) {
+    const attrs = Array.from(n.attributes).map(a => [a.name, a.value]);
+    const kids = Array.from(n.childNodes);
+    const mixed = kids.some(c => (c.nodeType === 3 || c.nodeType === 4) && c.nodeValue.trim() !== '');
+    const out = [];
+    for (const c of kids) {
+      if (c.nodeType === 1) out.push(nodeToTree(c));
+      else if (c.nodeType === 3 || c.nodeType === 4) { if (mixed) out.push(tx(c.nodeValue)); }
+      else if (c.nodeType === 8) out.push({ t: 'comment', value: c.nodeValue });
+      else if (c.nodeType === 7) out.push({ t: 'raw', value: `<?${c.target} ${c.data}?>` });
+    }
+    return el(n.nodeName, attrs, out);
+  }
+  return tx('');
+}
+function xmlToTree(xmlString) {
+  const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+  const err = doc.getElementsByTagName('parsererror')[0];
+  if (err) throw new Error('XML source mal formé : ' + err.textContent.trim().slice(0, 300));
+  const pis = [];
+  for (const n of Array.from(doc.childNodes)) if (n.nodeType === 7 && n.target !== 'xml') pis.push(`<?${n.target} ${n.data}?>`);
+  return { root: nodeToTree(doc.documentElement), pis };
+}
+const plainText = n => n.t === 'text' ? n.value : n.t === 'el' ? n.children.map(plainText).join(' ') : '';
+function collectIds(n, set) { if (n.t !== 'el') return; for (const [k, v] of n.attrs) if (k === 'xml:id') set.add(v); n.children.forEach(c => collectIds(c, set)); }
+
+function updateHeader(rootEl, o, ctx) {
+  const header = rootEl.children.find(c => c.t === 'el' && localName(c.name) === 'teiHeader');
+  if (!header) return;
+  const find = nm => header.children.find(c => c.t === 'el' && localName(c.name) === nm);
+  let enc = find('encodingDesc');
+  if (!enc) {
+    enc = el('encodingDesc');
+    const fd = header.children.findIndex(c => c.t === 'el' && localName(c.name) === 'fileDesc');
+    header.children.splice(fd + 1, 0, enc);
+  }
+  let ai = enc.children.find(c => c.t === 'el' && localName(c.name) === 'appInfo');
+  if (!ai) { ai = el('appInfo'); enc.children.push(ai); }
+  ai.children.push(appInfo().children[0]);
+  if (o.profile !== 'txm') enc.children.push(prefixDefs(ctx));
+  let rev = find('revisionDesc');
+  if (!rev) { rev = el('revisionDesc'); header.children.push(rev); }
+  rev.children.push(changeNode());
+}
+
+async function enrich(xmlString, analyse, opts, progress) {
+  const o = normalizeOptions(opts);
+  const { root: rootEl, pis } = xmlToTree(xmlString);
+  const names = new Set((Array.isArray(o.blockNames) ? o.blockNames : String(o.blockNames).split(',')).map(s => s.trim()).filter(Boolean));
+  const blocks = [];
+  (function walk(n) {
+    if (n.t !== 'el') return;
+    const ln = localName(n.name);
+    if (ln === 'teiHeader') return;
+    if (names.has(ln)) { blocks.push(n); return; }
+    n.children.forEach(walk);
+  })(rootEl);
+  const items = blocks.map(b => ({ node: b, text: plainText(b).replace(/\s+/g, ' ').trim() })).filter(x => x.text);
+  if (!items.length) throw new Error(`Aucun élément (${[...names].join(', ')}) contenant du texte n'a été trouvé dans le XML.`);
+
+  const conllus = await analyse(items.map(x => x.text), progress);
+  const used = new Set(); collectIds(rootEl, used);
+  const ctx = makeCtx(used);
+  let sentNo = 0;   // chaque bloc est analysé séparément : on renumérote les sent_id sur tout le document
+  items.forEach((it, i) => {
+    const { sentences } = parseConllu(conllus[i] || '');
+    sentences.forEach(s => { s.meta.sent_id = String(++sentNo); });
+    it.node.children = sentences.map(s => buildSentence(s, ctx, o));
+  });
+  updateHeader(rootEl, o, ctx);
+  const xml = prolog(o, pis.length ? pis.join('\n') + '\n' : '') + serializeTree(rootEl, o) + '\n';
+  return { xml, warnings: [], stats: { sentences: ctx.sentences, tokens: ctx.tokens, docs: items.length, blocks: items.length } };
+}
+
+/* ---------- utilitaires pour les flux d'analyse ---------- */
+function renumberSentIds(conllu) { let k = 0; return conllu.replace(/^#\s*sent_id\s*=.*$/gm, () => `# sent_id = ${++k}`); }
+function ensureNewpar(conllu) {
+  const t = conllu.replace(/^\s+/, '');
+  const firstBlock = t.split(/\r?\n\r?\n/)[0] || '';
+  return /^#\s*newpar/m.test(firstBlock) ? t : '# newpar\n' + t;
+}
+function mergeConllu(chunks) {
+  return renumberSentIds(chunks.map(c => ensureNewpar(c).trim() + '\n').join('\n'));
+}
+
+root.C2T = { DEFAULTS, parseConllu, convert, enrich, serializeTree, el, tx, sanitizeId, mergeConllu, renumberSentIds, ensureNewpar, normalizeOptions };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- ======================================================================
+     INTERFACE
+     ====================================================================== -->
+<script id="c2t-ui">
+const LINDAT = 'https://lindat.mff.cuni.cz/services/udpipe/api/';
+const S = { api: null, engines: [], tei: '', baseName: 'output' };
+const $ = id => document.getElementById(id);
+
+/* ---------- messages / onglets ---------- */
+let msgTimer;
+function showMessage(text, type, sticky) {
+  const m = $('message'); m.textContent = text; m.className = 'message visible ' + type;
+  clearTimeout(msgTimer);
+  if (!sticky) msgTimer = setTimeout(() => m.classList.remove('visible'), type === 'error' ? 12000 : 5000);
+}
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+}
+function setBusy(on, text) {
+  $('loading').classList.toggle('visible', on); $('analyseBtn').disabled = on;
+  if (text) $('loadingText').textContent = text;
+}
+
+/* ---------- options (mémorisées localement) ---------- */
+function getOptions() {
+  return {
+    profile: document.querySelector('input[name="profile"]:checked').value,
+    indent: $('optIndent').value, tokenLayout: $('optLayout').value, schema: $('optSchema').value,
+    keepMeta: $('optKeepMeta').checked, keepText: $('optKeepText').checked, enhanced: $('optEnhanced').checked,
+    splitMisc: $('optSplitMisc').checked, splitFeats: $('optSplitFeats').checked,
+    lang: $('mLang').value.trim(), title: $('mTitle').value.trim(), author: $('mAuthor').value.trim(),
+    publisher: $('mPublisher').value.trim(), licence: $('mLicence').value.trim(), licenceUrl: $('mLicenceUrl').value.trim(),
+    source: $('mSource').value.trim(), blockNames: $('blockNames').value
+  };
+}
+const PERSIST = ['optIndent', 'optLayout', 'optSchema', 'optKeepMeta', 'optKeepText', 'optEnhanced', 'optSplitMisc', 'optSplitFeats',
+  'mLang', 'mTitle', 'mAuthor', 'mPublisher', 'mLicence', 'mLicenceUrl', 'mSource', 'blockNames'];
+function saveOptions() {
+  try {
+    const d = { profile: getOptions().profile };
+    PERSIST.forEach(id => { const e = $(id); d[id] = e.type === 'checkbox' ? e.checked : e.value; });
+    localStorage.setItem('conllu2tei-options', JSON.stringify(d));
+  } catch (e) { /* stockage indisponible : sans conséquence */ }
+}
+function loadOptions() {
+  try {
+    const d = JSON.parse(localStorage.getItem('conllu2tei-options') || 'null'); if (!d) return;
+    PERSIST.forEach(id => { if (d[id] === undefined) return; const e = $(id); if (e.type === 'checkbox') e.checked = d[id]; else e.value = d[id]; });
+    if (d.profile) { const r = document.querySelector(`input[name="profile"][value="${d.profile}"]`); if (r) r.checked = true; }
+  } catch (e) { /* ignore */ }
+}
+
+/* ---------- entrée CoNLL-U ---------- */
+function handleConlluFile(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  S.baseName = f.name.replace(/\.[^.]+$/, '') || 'output';
+  const r = new FileReader();
+  r.onload = e => { $('conlluInput').value = e.target.result; showMessage('Fichier chargé : ' + f.name, 'success'); };
+  r.readAsText(f);
+}
+function loadExample() {
+  $('conlluInput').value = [
+    '# newdoc id = exemple',
+    '# newpar',
+    '# sent_id = ex-1',
+    '# text = Le chat dort dans la maison.',
+    '1\tLe\tle\tDET\t_\tDefinite=Def|Gender=Masc|Number=Sing|PronType=Art\t2\tdet\t_\t_',
+    '2\tchat\tchat\tNOUN\t_\tGender=Masc|Number=Sing\t3\tnsubj\t_\t_',
+    '3\tdort\tdormir\tVERB\t_\tMood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin\t0\troot\t_\t_',
+    '4\tdans\tdans\tADP\t_\t_\t6\tcase\t_\t_',
+    '5\tla\tle\tDET\t_\tDefinite=Def|Gender=Fem|Number=Sing|PronType=Art\t6\tdet\t_\t_',
+    '6\tmaison\tmaison\tNOUN\t_\tGender=Fem|Number=Sing\t3\tobl:mod\t_\tSpaceAfter=No',
+    '7\t.\t.\tPUNCT\t_\t_\t3\tpunct\t_\t_',
+    '',
+    '# sent_id = ex-2',
+    '# text = Il revient du marché.',
+    '1\tIl\til\tPRON\t_\tGender=Masc|Number=Sing|Person=3|PronType=Prs\t2\tnsubj\t_\t_',
+    '2\trevient\trevenir\tVERB\t_\tMood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin\t0\troot\t_\t_',
+    '3-4\tdu\t_\t_\t_\t_\t_\t_\t_\t_',
+    '3\tde\tde\tADP\t_\t_\t5\tcase\t_\t_',
+    '4\tle\tle\tDET\t_\tDefinite=Def|Gender=Masc|Number=Sing|PronType=Art\t5\tdet\t_\t_',
+    '5\tmarché\tmarché\tNOUN\t_\tGender=Masc|Number=Sing\t2\tobl:mod\t_\tSpaceAfter=No',
+    '6\t.\t.\tPUNCT\t_\t_\t2\tpunct\t_\t_', ''
+  ].join('\n');
+}
+
+/* ---------- conversion ---------- */
+function showResult(res) {
+  S.tei = res.xml;
+  const PREVIEW = 300000;
+  $('outputText').textContent = res.xml.length > PREVIEW ? res.xml.slice(0, PREVIEW) + `\n\n… aperçu tronqué (${res.xml.length.toLocaleString('fr-FR')} caractères au total ; le téléchargement contient tout).` : res.xml;
+  let wf = '';
+  try {
+    const d = new DOMParser().parseFromString(res.xml, 'application/xml');
+    wf = d.getElementsByTagName('parsererror').length ? '<span class="ko">✗ XML mal formé</span>' : '<span class="ok">✓ XML bien formé</span>';
+  } catch (e) { wf = ''; }
+  const st = res.stats;
+  $('stats').innerHTML = `${st.sentences} phrase(s) · ${st.tokens} token(s)` + (st.docs ? ` · ${st.docs} ${st.blocks ? 'bloc(s)' : 'document(s)'}` : '') + ' · ' + wf;
+  const w = $('warnings');
+  if (res.warnings && res.warnings.length) {
+    w.innerHTML = '<strong>' + res.warnings.length + ' avertissement(s) sur le CoNLL-U :</strong><br>' + res.warnings.slice(0, 60).map(x => x.replace(/</g, '&lt;')).join('<br>') + (res.warnings.length > 60 ? '<br>…' : '');
+    w.classList.add('visible');
+  } else w.classList.remove('visible');
+  $('outputArea').classList.add('visible');
+  $('outputArea').scrollIntoView({ behavior: 'smooth' });
+}
+function convertToTEI() {
+  const text = $('conlluInput').value.trim();
+  if (!text) { showMessage('Veuillez fournir du contenu CoNLL-U à convertir.', 'error'); return; }
+  saveOptions();
+  try {
+    const res = C2T.convert(text, getOptions());
+    showResult(res);
+    showMessage('Conversion réussie.', 'success');
+  } catch (e) { console.error(e); showMessage('Erreur lors de la conversion : ' + e.message, 'error'); }
+}
+
+function downloadTEI() {
+  if (!S.tei) { showMessage('Aucun contenu TEI à télécharger.', 'error'); return; }
+  const url = URL.createObjectURL(new Blob([S.tei], { type: 'application/xml' }));
+  const a = document.createElement('a'); a.href = url; a.download = S.baseName + '.xml';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function copyToClipboard() {
+  if (!S.tei) { showMessage('Aucun contenu à copier.', 'error'); return; }
+  navigator.clipboard.writeText(S.tei).then(() => showMessage('Contenu copié dans le presse-papier.', 'success'),
+    err => showMessage('Erreur lors de la copie : ' + err.message, 'error'));
+}
+function clearAll() {
+  ['fileInput', 'analyseFile'].forEach(id => $(id).value = '');
+  $('conlluInput').value = ''; $('textInput').value = '';
+  $('outputText').textContent = ''; $('outputArea').classList.remove('visible');
+  S.tei = ''; S.baseName = 'output'; $('message').classList.remove('visible');
+}
+
+/* ---------- moteurs d'analyse ---------- */
+const joinUrl = (base, path) => (base ? base.replace(/\/$/, '') + '/' : '') + path;
+
+async function detectServer() {
+  const q = new URLSearchParams(location.search).get('api');
+  const meta = (document.querySelector('meta[name="conllu2tei-api"]') || {}).content;
+  const cands = [];
+  if (q) cands.push(q); else if (meta) cands.push(meta);
+  else if (/^https?:$/.test(location.protocol) && !/github\.io$/.test(location.hostname)) cands.push('');
+  for (const base of cands) {
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 4000);
+      const r = await fetch(joinUrl(base, 'api/capabilities'), { signal: ctrl.signal }); clearTimeout(t);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && j.app === 'conllu2tei-server') return { base, caps: j };
+    } catch (e) { /* pas de serveur à cette adresse */ }
+  }
+  return null;
+}
+
+async function loadLindatEngine() {
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch(LINDAT + 'models', { signal: ctrl.signal }); clearTimeout(t);
+    const j = await r.json(); if (!j.models) return null;
+    const byLang = {};
+    Object.keys(j.models).forEach(m => { const l = m.split('-')[0]; (byLang[l] = byLang[l] || []).push(m); });
+    return { id: 'lindat-direct', kind: 'lindat-direct', label: 'UDPipe (API publique LINDAT)', accepts: ['text'],
+      languages: Object.keys(byLang).sort().map(l => ({ code: l, label: l, models: byLang[l] })) };
+  } catch (e) { return null; }
+}
+
+async function init() {
+  loadOptions();
+  const srv = await detectServer();
+  if (srv) {
+    S.api = srv.base;
+    S.engines = srv.caps.engines.map(e => Object.assign({ kind: 'server' }, e));
+    $('modeBadge').textContent = 'Mode serveur' + (srv.base ? ' · ' + srv.base : '');
+    $('modeBadge').className = 'badge server';
+  } else {
+    const l = await loadLindatEngine();
+    S.engines = l ? [l] : [];
+    $('modeBadge').textContent = 'Mode autonome' + (l ? ' · UDPipe LINDAT' : '');
+    $('modeBadge').className = 'badge standalone';
+  }
+  populateEngines();
+}
+
+function populateEngines() {
+  const has = S.engines.length > 0;
+  $('noEngine').classList.toggle('hidden', has);
+  $('analyseForm').classList.toggle('hidden', !has);
+  const es = $('engineSelect'); es.innerHTML = '';
+  S.engines.forEach((e, i) => es.add(new Option(e.label, i)));
+  es.onchange = populateLanguages; $('languageSelect').onchange = populateModels;
+  populateLanguages();
+}
+const curEngine = () => S.engines[+$('engineSelect').value];
+function populateLanguages() {
+  const e = curEngine(); const ls = $('languageSelect'); ls.innerHTML = '';
+  if (!e) return;
+  e.languages.forEach(l => ls.add(new Option(l.label, l.code)));
+  populateModels();
+}
+function populateModels() {
+  const e = curEngine(); const ms = $('modelSelect'); ms.innerHTML = '<option value="">Modèle par défaut</option>';
+  if (!e) return;
+  const l = e.languages.find(x => x.code === $('languageSelect').value);
+  if (l) l.models.forEach(m => ms.add(new Option(m, m)));
+}
+
+async function apiError(r) {
+  let msg = 'HTTP ' + r.status;
+  try { const j = await r.json(); if (j.detail) msg += ' : ' + (typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)); } catch (e) { /* ignore */ }
+  return new Error(msg);
+}
+async function analyzeTexts(engine, lang, model, texts, progress) {
+  const out = [];
+  if (engine.kind === 'lindat-direct') {
+    for (let i = 0; i < texts.length; i++) {
+      const fd = new FormData();
+      fd.append('data', texts[i]); fd.append('model', model || lang);
+      fd.append('tokenizer', ''); fd.append('tagger', ''); fd.append('parser', '');
+      const r = await fetch(LINDAT + 'process', { method: 'POST', body: fd });
+      if (!r.ok) throw await apiError(r);
+      const j = await r.json(); if (!j.result) throw new Error('Réponse UDPipe sans résultat.');
+      out.push(j.result);
+      progress && progress(i + 1, texts.length);
+    }
+    return out;
+  }
+  const BATCH = 20;
+  for (let i = 0; i < texts.length; i += BATCH) {
+    const r = await fetch(joinUrl(S.api, 'api/parse'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine: engine.id, lang, model: model || null, texts: texts.slice(i, i + BATCH) }) });
+    if (!r.ok) throw await apiError(r);
+    out.push(...(await r.json()).conllu);
+    progress && progress(Math.min(i + BATCH, texts.length), texts.length);
+  }
+  return out;
+}
+async function analyzeFile(engine, lang, file) {
+  const fd = new FormData(); fd.append('file', file); fd.append('language', lang); fd.append('file_type', 'auto'); fd.append('engine', engine.id);
+  const r = await fetch(joinUrl(S.api, 'api/parse-file'), { method: 'POST', body: fd });
+  if (!r.ok) throw await apiError(r);
+  return await r.text();
+}
+
+async function runAnalysis() {
+  const engine = curEngine(); if (!engine) { showMessage('Aucun moteur disponible.', 'error'); return; }
+  const lang = $('languageSelect').value, model = $('modelSelect').value;
+  const file = $('analyseFile').files[0];
+  const pasted = $('textInput').value;
+  if (!file && !pasted.trim()) { showMessage('Veuillez charger un fichier ou saisir un texte à analyser.', 'error'); return; }
+  saveOptions();
+  const progress = (i, n) => setBusy(true, `Analyse en cours… ${i}/${n}`);
+  try {
+    setBusy(true, 'Analyse en cours…');
+    const ext = file ? (file.name.split('.').pop() || '').toLowerCase() : 'txt';
+    if (file) S.baseName = file.name.replace(/\.[^.]+$/, '') || 'output';
+    const fileOnly = !engine.accepts.includes('text');
+    const exotic = ['cha', 'trs', 'eaf', 'textgrid'].includes(ext);
+
+    // 1. moteurs / formats qui passent par l'envoi d'un fichier (Corli)
+    if (fileOnly || exotic) {
+      if (!engine.accepts.includes('file')) throw new Error(`Le moteur « ${engine.label} » n'accepte pas les fichiers .${ext}. Choisissez le moteur Corli.`);
+      const f = file || new File([pasted], 'texte.txt', { type: 'text/plain' });
+      const conllu = await analyzeFile(engine, lang, f);
+      $('conlluInput').value = conllu; switchTab('conllu');
+      showMessage('Analyse terminée : CoNLL-U affiché dans le premier onglet. Cliquez sur « Convertir en TEI ».', 'success');
+      return;
+    }
+
+    const content = file ? await file.text() : pasted;
+    let kind = $('inputKind').value;
+    if (kind === 'auto') kind = (['xml', 'tei'].includes(ext) || (!file && content.trim().startsWith('<'))) ? 'xml' : 'text';
+    const analyse = (texts, p) => analyzeTexts(engine, lang, model, texts, p);
+
+    // 2. XML existant → XML enrichi
+    if (kind === 'xml') {
+      const opts = Object.assign(getOptions(), { lang: getOptions().lang || lang.slice(0, 2) });
+      const res = await C2T.enrich(content, analyse, opts, progress);
+      showResult(res);
+      showMessage('XML enrichi produit. Le XML source est conservé ; le contenu des éléments annotés est remplacé par des phrases <s>.', 'success');
+      return;
+    }
+
+    // 3. texte brut → CoNLL-U
+    const paras = content.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
+    const chunks = await analyse(paras, progress);
+    $('conlluInput').value = C2T.mergeConllu(chunks); switchTab('conllu');
+    showMessage('Analyse terminée : CoNLL-U affiché dans le premier onglet. Cliquez sur « Convertir en TEI ».', 'success');
+  } catch (e) {
+    console.error(e);
+    showMessage('Erreur lors de l\'analyse : ' + e.message + (S.api === null && !(S.engines[0] && S.engines[0].kind === 'server')
+      ? ' (en mode autonome, l\'API publique peut refuser les requêtes issues de cette page ; analysez le texte ailleurs puis collez le CoNLL-U).' : ''), 'error');
+  } finally { setBusy(false); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.options-grid input, .options-grid select').forEach(e => e.addEventListener('change', saveOptions));
+  init();
+});
+</script>
+</body>
+</html>
